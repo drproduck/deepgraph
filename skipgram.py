@@ -22,39 +22,6 @@ NUM_TRAIN_STEPS = 100000
 SKIP_STEP = 2000
 
 
-def feeder(path, mode, window_size):
-    f = open(path)
-    if mode == 'text':
-        word_list = [word for line in f for word in line.split()]
-        word_set = set(word_list)
-        word_to_idx = dict()
-        idx = 0
-        for word in word_set:
-            word_to_idx[word] = idx
-            idx += 1
-        idx_list = [word_to_idx[word] for word in word_list]
-        while True:
-            for i in range(window_size, len(word_list) - window_size):
-                for j in range(window_size * 2 + 1):
-                    yield ((idx_list[i], idx_list[i - window_size + j]))
-
-    if mode == 'graph':
-        g = np.loadtxt(path)
-        n = np.size(g, 1)
-        m = np.size(g, 2)
-        if not n == m: raise Exception('has to be square matrix')
-        g = np.divide(g, np.reshape(np.sum(g, 2), [n, 1]))
-        while True:
-            od = list(range(n))
-            np.random.shuffle(od)
-            for node in od:
-                prev_node = node
-                for _ in window_size:
-                    draw = np.random.multinomial(1, pvals=g[prev_node])
-                    next_node = [i for i in range(n) if draw[i] == 1][0]
-                    yield(node, next_node)
-                    prev_node = next_node
-
 
 
 
