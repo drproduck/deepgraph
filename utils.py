@@ -30,7 +30,7 @@ def feeder(path, g, mode, window_size):
             od = list(range(n))
             for node in od:
                 prev_node = node
-                for _ in range(window_size):
+                for _ in range(skip_window):
                     next_node = random.choices(range(n), weights=g[prev_node], k=1)[0]
                     yield(node, next_node)
                     prev_node = next_node

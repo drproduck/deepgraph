@@ -12,14 +12,14 @@ from tensorflow.contrib.tensorboard.plugins import projector
 
 # from language_models.skipgram.process_data import process_data
 
-VOCAB_SIZE = 50000
-BATCH_SIZE = 128
-EMBED_SIZE = 128  # dimension of the word embedding vectors
-SKIP_WINDOW = 1  # the context window
-NUM_SAMPLED = 64  # Number of negative examples to sample.
-LEARNING_RATE = 1.0
-NUM_TRAIN_STEPS = 100000
-SKIP_STEP = 2000
+# VOCAB_SIZE = 50000
+# BATCH_SIZE = 128
+# EMBED_SIZE = 128  # dimension of the word embedding vectors
+# SKIP_WINDOW = 1  # the context window
+# NUM_SAMPLED = 64  # Number of negative examples to sample.
+# LEARNING_RATE = 1.0
+# NUM_TRAIN_STEPS = 100000
+# SKIP_STEP = 2000
 
 
 
@@ -28,12 +28,11 @@ SKIP_STEP = 2000
 class SkipGram:
     """ Build the graph for word2vec model """
 
-    def __init__(self, vocab_size, embed_size, batch_size, nsampled, nclass, learning_rate):
+    def __init__(self, vocab_size, embed_size, batch_size, nsampled, learning_rate):
         self.vocab_size = vocab_size
         self.embed_size = embed_size  # size of embed vector
         self.batch_size = batch_size
         self.nsampled = nsampled  # number of contrastive samples (negative samples)
-        self.nclass = nclass
         self.lr = learning_rate
         # self.global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
 
@@ -62,7 +61,7 @@ class SkipGram:
             nce_weight = tf.Variable(tf.truncated_normal([self.vocab_size, self.embed_size],
                                                          stddev=1.0 / (self.embed_size ** 0.5)),
                                      name='nce_weight')
-            nce_bias = tf.Variable(tf.zeros([VOCAB_SIZE]), name='nce_bias')
+            nce_bias = tf.Variable(tf.zeros([self.vocab_size]), name='nce_bias')
 
             # define loss function to be NCE loss function
             self.loss = tf.reduce_mean(tf.nn.nce_loss(weights=nce_weight,
@@ -93,25 +92,26 @@ class SkipGram:
         # self._create_summaries()
 
 
-def train_model(model, batch_gen, num_train_steps):
-    saver = tf.train.Saver()  # defaults to saving all variables - in this case embed_matrix, nce_weight, nce_bias
+    def train_model(self, batch_gen, num_train_steps, skip_step):
+        # saver = tf.train.Saver()  # defaults to saving all variables - in this case embed_matrix, nce_weight, nce_bias
+        initial_step = 0
+        with tf.Session() as sess:
+            sess.run(tf.global_variables_initializer())
+            # ckpt = tf.train.get_checkpoint_state(os.path.dirname('checkpoints/skipgram/checkpoint'))
+            # # if that checkpoint exists, restore from checkpoint
+            # if ckpt and ckpt.model_checkpoint_path:
+            #     saver.restore(sess, ckpt.model_checkpoint_path)
 
-    initial_step = 0
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        ckpt = tf.train.get_checkpoint_state(os.path.dirname('checkpoints/skipgram/checkpoint'))
-        # if that checkpoint exists, restore from checkpoint
-        if ckpt and ckpt.model_checkpoint_path:
-            saver.restore(sess, ckpt.model_checkpoint_path)
+            total_loss = 0.0  # we use this to calculate late average loss in the last SKIP_STEP steps
+            for index in range(num_train_steps):
+                centers, targets = next(batch_gen)
+                feed_dict = {self.center_words: centers, self.target_words: targets}
+                loss_batch, _, = sess.run([self.loss, self.optimizer],
+                                          feed_dict=feed_dict)
+                total_loss += loss_batch
+                if (index + 1) % skip_step == 0:
+                    print('Average loss at step {}: {:5.1f}'.format(index, total_loss / skip_step))
+                    total_loss = 0.0
+                    # saver.save(sess, 'checkpoints/skipgram/skip-gram', index)
 
-        total_loss = 0.0  # we use this to calculate late average loss in the last SKIP_STEP steps
-        for index in range(num_train_steps):
-            centers, targets = next(batch_gen)
-            feed_dict = {model.center_words: centers, model.target_words: targets}
-            loss_batch, _, = sess.run([model.loss, model.optimizer],
-                                      feed_dict=feed_dict)
-            total_loss += loss_batch
-            if (index + 1) % SKIP_STEP == 0:
-                print('Average loss at step {}: {:5.1f}'.format(index, total_loss / SKIP_STEP))
-                total_loss = 0.0
-                saver.save(sess, 'checkpoints/skipgram/skip-gram', index)
+            return sess.run(self.embed_matrix)
