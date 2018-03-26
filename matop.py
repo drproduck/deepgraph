@@ -21,6 +21,9 @@ def eudist(A, B, sqrted=True):
         return (AA - AB + BB) ** 0.5
     else: return (AA - AB + BB)
 
+def cumdist_matrix(in_matrix):
+    """convert matrix to row-cumulative matrix, where each row is a cdf (last entry is 1)
+        good for numpy"""
 
 def main():
     a = np.array([[1,2],[3,4]])

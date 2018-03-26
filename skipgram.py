@@ -44,9 +44,8 @@ class SkipGram:
 
     def _create_embedding(self):
         """ Step 2: define weights. In word2vec, it's actually the weights that we care about """
-        with tf.device('/cpu:0'):
-            with tf.name_scope("embed"):
-                self.embed_matrix = tf.Variable(tf.random_uniform([self.vocab_size,
+        with tf.name_scope("embed"):
+            self.embed_matrix = tf.Variable(tf.random_uniform([self.vocab_size,
                                                                    self.embed_size], -1.0, 1.0),
                                                 name='embed_matrix')
 
