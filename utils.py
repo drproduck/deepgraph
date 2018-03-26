@@ -19,8 +19,11 @@ def text_feeder(path, window_size):
                 yield ((idx_list[i], idx_list[i - window_size + j]))
 
 
-def graph_feeder(adjmatrix_path, window_size, cumulative=True):
-    adjmatrix = np.loadtxt(adjmatrix_path)
+def graph_feeder(adjmatrix_path=None, adjmatrix=None, window_size=10, cumulative=True):
+    if not adjmatrix_path is None and adjmatrix is None:
+        adjmatrix = np.loadtxt(adjmatrix_path)
+    elif (adjmatrix_path is None and adjmatrix is None) or (adjmatrix_path is not None and adjmatrix is not None):
+        raise Exception('either adjmatrix_path or adjmatrix but not both has to be specified')
     n = np.size(adjmatrix, 0)
     m = np.size(adjmatrix, 1)
     if not n == m: raise Exception('has to be square matrix')
@@ -38,14 +41,13 @@ def graph_feeder(adjmatrix_path, window_size, cumulative=True):
                 yield (node, next_node)
                 prev_node = next_node
 
-def batch_feeder(path, mode, batch_size, window_size):
+def batch_feeder(path=None, mat=None, mode='text', batch_size=128, window_size=10):
     if mode == 'text':
         feed = text_feeder(path, window_size)
-    # assuming that graph is True
     elif mode == 'graph':
-        feed = graph_feeder(path, window_size, cumulative=False)
+        feed = graph_feeder(path, mat, window_size, cumulative=False)
     elif mode == 'cum_graph':
-        feed = graph_feeder(path, window_size, cumulative=True)
+        feed = graph_feeder(path, mat, window_size, cumulative=True)
     else: raise Exception('unsupported mode')
 
     context = np.ndarray([batch_size], dtype=np.int32)
