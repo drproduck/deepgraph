@@ -57,6 +57,8 @@ def batch_feeder(path=None, mat=None, mode='text', batch_size=128, window_size=1
             context[i], targets[i, 0] = next(feed)
         yield (context, targets)
 
+def greedy_matching(a, b):
+
 
 def make_weight_matrix(fea, mode, **kwargs):
     assert type(fea) == np.ndarray
