@@ -57,7 +57,23 @@ def batch_feeder(path=None, mat=None, mode='text', batch_size=128, window_size=1
             context[i], targets[i, 0] = next(feed)
         yield (context, targets)
 
-def greedy_matching(a, b):
+def greedy_matching(labels, targets, in_place=False):
+    """match labels to target labels, so that difference is minimized"""
+    from collections import Counter
+    labels_count = Counter(labels)
+    targets_count = Counter(targets)
+    labels_sort = labels_count.most_common()
+    targets_sort = targets_count.most_common()
+    mapping = dict()
+    diff = 0
+    print(labels_sort)
+    print(targets_sort)
+    for x, y in zip(labels_sort, targets_sort):
+        print(x[0],x[1],y[0],y[1])
+        mapping[x[0]] = y[0]
+        diff += abs(x[1] - y[1])
+        print(mapping)
+    return [mapping[x] for x in labels], diff
 
 
 def make_weight_matrix(fea, mode, **kwargs):

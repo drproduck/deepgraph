@@ -6,7 +6,7 @@ from scipy.linalg.decomp_svd import svd as scipysvd
 from sklearn.utils.extmath import randomized_svd
 from sklearn.cluster import KMeans
 from time import time
-from utils import make_weight_matrix
+from utils import make_weight_matrix, greedy_matching
 
 def _normalize_svd(fea, k, mode, sigma=None, normalize=True):
     if mode == 'gaussian' and sigma is None:
@@ -53,14 +53,20 @@ def svd_speed_test(mat):
 def main():
     # mat = np.random.randn(2000, 2000)
     # svd_speed_test(mat)
-    content = scipy.io.loadmat('/home/drproduck/Documents/circledata_50.mat')
+    content = scipy.io.loadmat('../data/circledata_50.mat', mat_dtype=True)
     fea = content['fea']
-    gnd = content['gnd']
+    gnd = content['gnd'].reshape(2000)
+    import matplotlib.pyplot as plt
+    plt.scatter(fea[:,0], fea[:,1], c=gnd.reshape(2000))
     # [u,s,v] = _normalize_svd(fea, 2, mode='gaussian', sigma=30)
     # print(u)
     labels = spectral_clustering(fea, 2, mode='gaussian', sigma=30)
+    labels = [int(x) for x in labels]
+    gnd = [int(x) for x in gnd]
     # print(np.concatenate((labels, gnd), 1))
+    labels, diff = greedy_matching(labels, gnd)
     print(labels)
-    print(gnd)
+    print(2000 - diff)
+    plt.show()
 if __name__ == '__main__':
     main()
