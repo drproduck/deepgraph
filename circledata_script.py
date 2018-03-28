@@ -3,28 +3,7 @@ import tensorflow as tf
 import os
 import scipy.io as scio
 import matop
-
-def preprocess():
-    content = scio.loadmat('/home/drproduck/Documents/circledata_50.mat', mat_dtype=True)
-    global fea, gnd
-    fea = content['fea']
-    gnd = content['gnd']
-    SIGMA = 30
-
-    w = matop.eudist(fea, fea, False)
-    n = np.size(w, 0)
-    m = np.size(w, 1)
-    if not n == m:
-        raise Exception('dimensions must agree')
-    w = np.exp(-w/(2*(SIGMA**2)))
-    w = w - np.eye(n, n)
-    print(w[1:10, :])
-
-    import utils
-    bf = utils.batch_feeder(mat=w, mode='graph', window_size=20)
-    context, target = next(bf)
-    print(context, target)
-    return bf
+import scipy.sparse as sparse
 
 def train(bf, save_dir):
     from skipgram import SkipGram
@@ -44,11 +23,50 @@ def postprocess(save_dir, gnd=None):
         ax.scatter(embedding[:,0], embedding[:,1], embedding[:,2], c=gnd)
     else:
         ax.scatter(embedding[:,0], embedding[:,1], embedding[:,2])
+    plt.show()
 
 def main():
-    bf = preprocess()
+    content = scio.loadmat('/home/drproduck/Documents/circledata_50.mat', mat_dtype=True)
+    fea = content['fea']
+    gnd = content['gnd']
+    SIGMA = 30
+
+    w = matop.eudist(fea, fea, False)
+    n = np.size(w, 0)
+    m = np.size(w, 1)
+    if not n == m:
+        raise Exception('dimensions must agree')
+    w = np.exp(-w/(2*(SIGMA**2)))
+    w = w - np.eye(n, n)
+    # print(np.min(np.max(w, 1), 0))
+    # w = np.where(w >= 0.008, 1, 0)
+    # print(np.shape(w))
+    # print(w[:10, :])
+
+    # take the k maximum values of each row
+    k = 3
+    lobound = -1
+    cols = list()
+    row_enum = np.arange(n)
+    rows = np.repeat(row_enum[None,:], k, axis=0).reshape(n*k).tolist()
+    for i in range(k):
+        col_argmax = np.argmax(w, 1)
+        w[row_enum, col_argmax] = lobound
+        cols.extend(col_argmax)
+    sw = sparse.coo_matrix(([1]*(n*k), (rows, cols)), shape=(n,m), dtype=np.float64).tocsr()
+    print(sw)
+    scio.savemat('circledata_sparse',{'network': sw})
+
+    import utils
+    bf = utils.batch_feeder(mat=sw, mode='graph', window_size=20)
+    import matplotlib.pyplot as plt
+    import random
+    # sample = random.sample(range(2000**2), 10000)
+    # plt.hist(w.reshape(2000**2)[sample], bins=100)
+    # print(sum(w.reshape(2000**2) >= 0.008) / 4000000)
+    # plt.show()
     train(bf, 'circle_embed')
-    postprocess('circle_embed', gnd=gnd)
+    postprocess('circle_embed.npy', gnd=gnd.reshape(2000))
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import matop
-
+import scipy.sparse as sparse
 
 def text_feeder(path, window_size):
     f = open(path, 'rb')
@@ -30,16 +30,32 @@ def graph_feeder(adjmatrix_path=None, adjmatrix=None, window_size=10, cumulative
     skip_window = 2 * window_size
     if not cumulative:
         import itertools
-        adjmatrix = np.array(list(itertools.accumulate(adjmatrix.transpose()))).transpose()
 
-    while True:
-        od = list(range(n))
-        for node in od:
-            prev_node = node
-            for _ in range(skip_window):
-                next_node = random.choices(range(n), weights=adjmatrix[prev_node], k=1)[0]
-                yield (node, next_node)
-                prev_node = next_node
+    if not sparse.isspmatrix(adjmatrix):
+        adjmatrix = np.array(list(itertools.accumulate(adjmatrix.transpose()))).transpose()
+        while True:
+            od = np.arange(n)
+            random.shuffle(od)
+            for node in od:
+                prev_node = node
+                for _ in range(skip_window):
+                    next_node = random.choices(range(n), cum_weights=adjmatrix[prev_node], k=1)[0]
+                    yield (node, next_node)
+                    prev_node = next_node
+    else:
+        print('This is sparse')
+        while True:
+            od = np.arange(n)
+            random.shuffle(od)
+            for node in od:
+                prev_node = node
+                for _ in range(skip_window):
+                    _, c, v = sparse.find(adjmatrix[prev_node])
+                    next_node = random.choices(c, weights=v, k=1)[0]
+                    yield(node, next_node)
+                    prev_node = next_node
+
+
 
 def batch_feeder(path=None, mat=None, mode='text', batch_size=128, window_size=10):
     if mode == 'text':
