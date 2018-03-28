@@ -58,7 +58,8 @@ def main():
     scio.savemat('circledata_sparse',{'network': sw})
 
     import utils
-    bf = utils.batch_feeder(mat=sw, mode='graph', window_size=20)
+    bf = utils.batch_feeder(mat=sw, mode='graph', walk_length=20, window_size=5)
+    print(next(bf))
     import matplotlib.pyplot as plt
     import random
     # sample = random.sample(range(2000**2), 10000)
