@@ -60,6 +60,31 @@ def graph_feeder(adjmatrix_path=None, adjmatrix=None, walk_length=40, window_siz
                     for t in walk[i+1:i+right_gap+1]:
                         yield(node, t)
 
+def fast_graph_feeder(adjmatrix_path=None, adjmatrix=None, walk_length=40, window_size=40):
+    if not adjmatrix_path is None and adjmatrix is None:
+        adjmatrix = np.loadtxt(adjmatrix_path)
+    elif (adjmatrix_path is None and adjmatrix is None) or (adjmatrix_path is not None and adjmatrix is not None):
+        raise Exception('either adjmatrix_path or adjmatrix but not both has to be specified')
+    n = np.size(adjmatrix, 0)
+    m = np.size(adjmatrix, 1)
+    if not n == m: raise Exception('has to be square matrix')
+    # skip_window = 2 * window_size
+
+    if not sparse.isspmatrix(adjmatrix):
+        adjmatrix = np.array(list(itertools.accumulate(adjmatrix.transpose()))).transpose()
+    while True:
+        od = np.arange(n)
+        random.shuffle(od)
+        for node in od:
+            walk = make_walk(adjmatrix, n, node, walk_length)
+            for i in range(walk_length):
+                for _ in range(window_size):
+                    left_gap = i if i < window_size else window_size
+                    for t in walk[i - left_gap:i]:
+                        yield(node, t)
+                    right_gap = walk_length-i-1 if walk_length-i-1 < window_size else window_size
+                    for t in walk[i+1:i+right_gap+1]:
+                        yield(node, t)
 
 def batch_feeder(path=None, mat=None, mode='graph', batch_size=128, walk_length=40, window_size=10):
     if mode == 'text':
