@@ -1,8 +1,6 @@
 import numpy as np
-import tensorflow as tf
-import os
 import scipy.io as scio
-import matop
+from utils import matop
 import scipy.sparse as sparse
 
 def train(bf, save_dir):
@@ -16,7 +14,6 @@ def train(bf, save_dir):
 
 def postprocess(save_dir, gnd=None):
     embedding = np.load(save_dir)
-    from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
     ax = plt.figure().add_subplot(111, projection='3d')
     if gnd is not None:
@@ -60,8 +57,6 @@ def main():
     import utils
     bf = utils.batch_feeder(mat=sw, mode='graph', walk_length=20, window_size=5)
     print(next(bf))
-    import matplotlib.pyplot as plt
-    import random
     # sample = random.sample(range(2000**2), 10000)
     # plt.hist(w.reshape(2000**2)[sample], bins=100)
     # print(sum(w.reshape(2000**2) >= 0.008) / 4000000)

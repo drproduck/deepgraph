@@ -1,6 +1,6 @@
 import random
 import numpy as np
-import matop
+from utils import matop
 import scipy.sparse as sparse
 import itertools
 
