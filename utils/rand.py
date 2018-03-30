@@ -27,7 +27,6 @@ class alias_sampling():
 
     def dim1_sampling(self, weights, prob, alias):
         alpha = (1.0 * self.n_face) / weights.sum()
-        print(weights)
         weights *= alpha
         indices = range(weights.shape[0])
 
@@ -88,7 +87,6 @@ class alias_sampling():
         if len(self.shape) == 2 and index is None: raise Exception('index required for table of multiple distributions')
         if self.issparse:
             _,c,_ = sparse.find(self.weights_table[index])
-            print(c)
             face = c[floor(random()*c.size)]
             return face if random() < self.prob_table[index,face] else self.alias_table[index,face]
         else:
@@ -112,18 +110,24 @@ class alias_sampling():
         return ret
 
 def main():
-    gen = alias_sampling(np.array([[1,2,3,4],[4,3,2,1]], dtype=np.float64))
-    x = np.array([gen.sample(0) for i in range(100)])
-    y = np.array([gen.sample(1) for i in range(100)])
-    gen_sparse = alias_sampling(sparse.coo_matrix(([1,2,3,4], ([0,0,0,0], [1,4,7,10])), shape=(1,11), dtype=np.float64).tocsr())
-    z = np.array([gen_sparse.sample(0) for _ in range(10000)])
+    from time import time
+    ar = np.random.rand(5000, 5000)
+    ar[np.where(ar > 0.2)] = 0
+    a = time()
+    gen = alias_sampling(ar)
+    x = np.array([gen.sample(0) for i in range(1000)])
+    b = time()
+    print('time for dense: {}'.format(b-a))
+    a = time()
+    gen_sparse = alias_sampling(sparse.csc_matrix(ar))
+    z = np.array([gen_sparse.sample(0) for _ in range(1000)])
+    b = time()
+    print('time for sparse: {}'.format(b-a))
     import matplotlib.pyplot as plt
     plt.figure(1)
-    plt.subplot(131)
+    plt.subplot(121)
     plt.hist(x)
-    plt.subplot(132)
-    plt.hist(y)
-    plt.subplot(133)
+    plt.subplot(122)
     plt.hist(z)
     plt.show()
 

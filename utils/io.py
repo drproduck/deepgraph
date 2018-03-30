@@ -68,7 +68,6 @@ def fast_graph_feeder(adjmatrix_path=None, adjmatrix=None, walk_length=40, windo
     n = np.size(adjmatrix, 0)
     m = np.size(adjmatrix, 1)
     if not n == m: raise Exception('has to be square matrix')
-    # skip_window = 2 * window_size
 
     if not sparse.isspmatrix(adjmatrix):
         adjmatrix = np.array(list(itertools.accumulate(adjmatrix.transpose()))).transpose()
