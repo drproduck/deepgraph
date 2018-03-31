@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import itertools
 def sloweudist(A, B):
     n = np.size(A, 0)
     m = np.size(B,0)
@@ -21,27 +22,35 @@ def eudist(A, B, sqrted=True):
         return (AA - AB + BB) ** 0.5
     else: return (AA - AB + BB)
 
-def cumdist_matrix(in_matrix):
+def cumdist_matrix(matrix, axis=0):
     """convert matrix to row-cumulative matrix, where each row is a cdf (last entry is 1)
         good for numpy"""
+    if axis is 1:
+        cum_mat = np.array(list(itertools.accumulate(matrix)))
+    elif axis is 0: cum_mat = np.array(list(itertools.accumulate(matrix.transpose()))).transpose()
+    else: raise Exception('cumulative matrix only supports first 2 dimensions')
+    return cum_mat
 
 def main():
     a = np.array([[1,2],[3,4]])
-    b = np.array([[5,6],[7,8]])
-    print(eudist(a,b,False))
-
-    a = np.random.normal(0,1, [2000, 2000])
-    b = np.random.normal(0,1, [4000, 2000])
-    start = time.time()
-    x = eudist(a,b, True)
-    stop = time.time()
+    # b = np.array([[5,6],[7,8]])
+    # print(eudist(a,b,False))
+    #
+    # a = np.random.normal(0,1, [2000, 2000])
+    # b = np.random.normal(0,1, [4000, 2000])
+    # start = time.time()
+    # x = eudist(a,b, True)
+    # stop = time.time()
+    # print(x)
+    # print(stop - start)
+    # start = time.time()
+    # x = sloweudist(a,b)
+    # stop = time.time()
+    # print(x)
+    # print(stop - start)
+    x = cumdist_matrix(a, 0)
     print(x)
-    print(stop - start)
-    start = time.time()
-    x = sloweudist(a,b)
-    stop = time.time()
-    print(x)
-    print(stop - start)
+    print(cumdist_matrix(a, 1))
 
 if __name__ == "__main__":
     main()
