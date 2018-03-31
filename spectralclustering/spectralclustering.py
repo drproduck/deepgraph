@@ -12,7 +12,7 @@ from utils.matop import eudist, cumdist_matrix
 from random import sample, choices
 import scipy.sparse as sp
 
-def _normalize_svd(fea, k, mode, sigma=None, normalize=True):
+def _symmetric_laplacian(fea, k, mode, sigma=None):
     if mode == 'gaussian' and sigma is None:
         raise Exception('mode Gaussian requires sigma specified')
     w = make_weight_matrix(fea, mode, sigma=sigma)
@@ -20,11 +20,29 @@ def _normalize_svd(fea, k, mode, sigma=None, normalize=True):
     d1 = (w.sum(1)**(-0.5))[:,None]
     d2 = w.sum(0)**(-0.5)
     L = (d1 * w) * d2
+    return L
+
+def _landmark_bipartite_laplacian(fea, reps, k, affinity='gaussian', sigma=None):
+    if affinity == 'gaussian':
+        if sigma is None: raise Exception('affinity gaussian requires sigma be specified')
+        w = eudist(fea, reps, False)
+        w = 1.0 / np.exp(w / 2 * sigma**2)
+        d1 = (w.sum(1)**(-0.5))[:,None]
+        d2 = w.sum(0)**(-0.5)
+        L = (d1 * w) * d2
+        return L
+
+def _svd_embedding(L, k, normalize=True, remove_first=True):
     [u,s,v] = randomized_svd(L, n_components=k)
     if normalize:
         u = u * ((u**2).sum(1)**-0.5)[:,None]
         v = v * ((v**2).sum(1)**-0.5)[:,None]
+    if remove_first:
+        u = u[:,1:]
+        v = v[:,1:]
+        s = s[1:]
     return u,s,v
+
 
 def pick_representatives(fea, n_reps, mode='random'):
     if mode == 'random':
@@ -59,16 +77,24 @@ def  plusplus(fea, n_reps):
         # print(closest_distances[closest_distances < 0])
     return centers_idx
 
-def spectral_clustering(fea, k, mode, sigma=None):
-    u,_,_ = _normalize_svd(fea, k, mode, sigma=sigma)
+def spectral_clustering(fea, k, affinity, sigma=None):
+    L = _symmetric_laplacian(fea, k, affinity, sigma=sigma)
+    u,_,_ = _svd_embedding(L)
     kmeans = KMeans(n_clusters=k, init='k-means++', n_init=10, max_iter=100, n_jobs=-1)
     return kmeans.fit_predict(u)
 
-def _landmark_bipartite_svd(fea, reps, k, affinity='gaussian', sigma=None):
-    if affinity == 'gaussian':
-        if sigma is None: raise Exception('affinity gaussian requires sigma be specified')
-        w = eudist(fea, reps, False)
-        w = 1 / np.exp
+def bipartite_clustering(fea, k, affinity, n_reps=500, select_method='++', use_embedding='v', sigma=None):
+    reps = pick_representatives(fea, n_reps, select_method)
+    L = _landmark_bipartite_laplacian(fea, reps, k, affinity, sigma)
+    u,s,v = _svd_embedding(L, k)
+    kmeans = KMeans(n_clusters=k, n_init=10, max_iter=100, n_jobs=-1)
+    if use_embedding=='u':
+        return kmeans.fit_predict(u)
+    elif use_embedding=='v':
+        return kmeans.fit_predict(v)
+    elif use_embedding=='uv':
+        return kmeans.fit_predict(np.concatenate((u,v), axis=0))
+
 
 
 def svd_speed_test(mat):
@@ -119,6 +145,8 @@ def test_plusplus(path):
     # plt.scatter(fea[:,0], fea[:,1], c=color)
 
     # plt.show()
+
+def
 def main():
     test_plusplus('../data/news.mat')
     # mat = np.random.randn(2000, 2000)
