@@ -9,7 +9,7 @@ from sklearn.cluster import KMeans, k_means_
 from time import time
 from utils.io import make_weight_matrix, greedy_matching
 from utils.matop import eudist, cumdist_matrix
-from random import sample
+from random import sample, choices
 import scipy.sparse as sp
 
 def _normalize_svd(fea, k, mode, sigma=None, normalize=True):
@@ -46,15 +46,17 @@ def  plusplus(fea, n_reps):
     else: new_center = fea[idx,:].reshape(1,n2)
 
     closest_distances = eudist(fea, new_center, False).reshape(n1)
+    closest_distances[idx] = 0
     for i in range(1, n_reps):
-        idx = choice(n1, p=closest_distances/closest_distances.sum())
+        idx = choices(range(n1), weights=closest_distances, k=1)[0]
         centers_idx[i] = idx
         if sp.isspmatrix(fea):
             new_center = fea[idx,:].toarray().reshape(1,n2)
         else: new_center = fea[idx,:].reshape(1,n2)
-        new_center_distances = eudist(fea, new_center, False).reshape(n1)
-        closest_distances = np.minimum(closest_distances, new_center_distances)
-        cumsum = cumdist_matrix(closest_distances)
+        distances_to_new_center = eudist(fea, new_center, False).reshape(n1)
+        distances_to_new_center[idx] = 0
+        closest_distances = np.minimum(closest_distances, distances_to_new_center)
+        # print(closest_distances[closest_distances < 0])
     return centers_idx
 
 def spectral_clustering(fea, k, mode, sigma=None):
@@ -96,6 +98,7 @@ def test_plusplus(path):
     from time import time
     content = scipy.io.loadmat(path, mat_dtype=True)
     fea = content['fea']
+    print(fea.shape)
     # gnd = content['gnd'].reshape(2000)
     a = time()
     _, idx1 = pick_representatives(fea, 1000, mode='random')
