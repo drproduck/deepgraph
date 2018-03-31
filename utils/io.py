@@ -35,7 +35,7 @@ def make_walk(adjmatrix, v_size, node, walk_length):
     return walk
 
 
-def graph_feeder(adjmatrix_path=None, adjmatrix=None, walk_length=40, window_size=40, speed_tradeoff=True):
+def graph_feeder(adjmatrix_path=None, adjmatrix=None, walk_length=40, window_size=40):
     if not adjmatrix_path is None and adjmatrix is None:
         adjmatrix = np.loadtxt(adjmatrix_path)
     elif (adjmatrix_path is None and adjmatrix is None) or (adjmatrix_path is not None and adjmatrix is not None):
@@ -45,15 +45,12 @@ def graph_feeder(adjmatrix_path=None, adjmatrix=None, walk_length=40, window_siz
     if not n == m: raise Exception('has to be square matrix')
     # skip_window = 2 * window_size
 
-    if not sparse.isspmatrix(adjmatrix):
-        adjmatrix = np.array(list(itertools.accumulate(adjmatrix.transpose()))).transpose()
-    if speed_tradeoff:
-        sample_generator = utils.rand.alias_sampling(adjmatrix)
+    sample_generator = utils.rand.alias_sampling(adjmatrix)
     while True:
         od = np.arange(n)
         random.shuffle(od)
         for node in od:
-            walk = sample_generator.sample_walk(node, walk_length) if speed_tradeoff else make_walk(adjmatrix, n, node, walk_length)
+            walk = sample_generator.sample_walk(node, walk_length)
             for i in range(walk_length):
                 for _ in range(window_size):
                     left_gap = i if i < window_size else window_size
