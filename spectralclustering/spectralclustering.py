@@ -79,7 +79,7 @@ def  plusplus(fea, n_reps):
 
 def spectral_clustering(fea, k, affinity, sigma=None):
     L = _symmetric_laplacian(fea, k, affinity, sigma=sigma)
-    u,_,_ = _svd_embedding(L)
+    u,_,_ = _svd_embedding(L, k)
     kmeans = KMeans(n_clusters=k, init='k-means++', n_init=10, max_iter=100, n_jobs=-1)
     return kmeans.fit_predict(u)
 
@@ -94,8 +94,6 @@ def bipartite_clustering(fea, k, affinity, n_reps=500, select_method='++', use_e
         return kmeans.fit_predict(v)
     elif use_embedding=='uv':
         return kmeans.fit_predict(np.concatenate((u,v), axis=0))
-
-
 
 def svd_speed_test(mat):
 
@@ -146,25 +144,25 @@ def test_plusplus(path):
 
     # plt.show()
 
-def
+def test_spectral_clustering(path):
+    content = scipy.io.loadmat('../data/circledata_50.mat', mat_dtype=True)
+    fea = content['fea']
+    gnd = content['gnd'].reshape(2000)
+    import matplotlib.pyplot as plt
+    labels = spectral_clustering(fea, 2, affinity='gaussian', sigma=30)
+    labels = [int(x) for x in labels]
+    gnd = [int(x) for x in gnd]
+    # print(np.concatenate((labels, gnd)))
+    labels, diff = greedy_matching(labels, gnd)
+    plt.scatter(fea[:,0], fea[:,1], c=labels)
+    print(2000 - diff)
+    plt.show()
+
 def main():
-    test_plusplus('../data/news.mat')
+    # test_plusplus('../data/news.mat')
+    test_spectral_clustering('../data/circledata_50.mat')
     # mat = np.random.randn(2000, 2000)
     # svd_speed_test(mat)
-    # content = scipy.io.loadmat('../data/circledata_50.mat', mat_dtype=True)
-    # fea = content['fea']
-    # gnd = content['gnd'].reshape(2000)
-    # import matplotlib.pyplot as plt
-    # plt.scatter(fea[:,0], fea[:,1], c=gnd.reshape(2000))
-    # [u,s,v] = _normalize_svd(fea, 2, mode='gaussian', sigma=30)
-    # print(u)
-    # labels = spectral_clustering(fea, 2, mode='gaussian', sigma=30)
-    # labels = [int(x) for x in labels]
-    # gnd = [int(x) for x in gnd]
-    # print(np.concatenate((labels, gnd), 1))
-    # labels, diff = greedy_matching(labels, gnd)
-    # print(labels)
-    # print(2000 - diff)
-    # plt.show()
+
 if __name__ == '__main__':
     main()
