@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import choice
 from numpy.linalg import svd as numpysvd
 import scipy.io
 from scipy.sparse.linalg import svds
@@ -8,7 +9,7 @@ from sklearn.cluster import KMeans, k_means_
 from time import time
 from utils.io import make_weight_matrix, greedy_matching
 from utils.matop import eudist, cumdist_matrix
-from random import sample, choice, choices
+from random import sample
 import scipy.sparse as sp
 
 def _normalize_svd(fea, k, mode, sigma=None, normalize=True):
@@ -26,12 +27,13 @@ def _normalize_svd(fea, k, mode, sigma=None, normalize=True):
     return u,s,v
 
 def pick_representatives(fea, n_reps, mode='random'):
-    if mode is 'random':
+    if mode == 'random':
         n = fea.shape[0]
-        idx = choice(n, n_reps, replace=False)
-        return fea[idx,:]
-    elif mode is '++':
-        k_means_._k_init(fea, n_reps, )
+        idx = sample(range(n), n_reps)
+        return fea[idx,:], idx
+    elif mode == '++':
+        idx = plusplus(fea, n_reps)
+        return fea[idx,:], idx
 
 def  plusplus(fea, n_reps):
     n1, n2 = fea.shape
@@ -39,23 +41,33 @@ def  plusplus(fea, n_reps):
     centers_idx = np.zeros(n_reps, dtype=np.int32)
     idx = np.random.randint(0, n1)
     centers_idx[0] = idx
-    closest_distances = eudist(fea, fea[idx,:].reshape(1,n2), False).reshape(n1)
-    cumsum = cumdist_matrix(closest_distances)
+    if sp.isspmatrix(fea):
+        new_center = fea[idx,:].toarray().reshape(1,n2)
+    else: new_center = fea[idx,:].reshape(1,n2)
+
+    closest_distances = eudist(fea, new_center, False).reshape(n1)
     for i in range(1, n_reps):
-        idx = choices(np.arange(n1), cum_weights=cumsum, k=1)[0]
+        idx = choice(n1, p=closest_distances/closest_distances.sum())
         centers_idx[i] = idx
-        new_center_distances = eudist(fea, fea[idx,:].reshape(1,n2), False).reshape(n1)
+        if sp.isspmatrix(fea):
+            new_center = fea[idx,:].toarray().reshape(1,n2)
+        else: new_center = fea[idx,:].reshape(1,n2)
+        new_center_distances = eudist(fea, new_center, False).reshape(n1)
         closest_distances = np.minimum(closest_distances, new_center_distances)
         cumsum = cumdist_matrix(closest_distances)
-    return fea[centers_idx,:], centers_idx
+    return centers_idx
 
 def spectral_clustering(fea, k, mode, sigma=None):
     u,_,_ = _normalize_svd(fea, k, mode, sigma=sigma)
     kmeans = KMeans(n_clusters=k, init='k-means++', n_init=10, max_iter=100, n_jobs=-1)
     return kmeans.fit_predict(u)
 
-def _landmark_bipartite_svd(fea, reps, k):
-    ""
+def _landmark_bipartite_svd(fea, reps, k, affinity='gaussian', sigma=None):
+    if affinity == 'gaussian':
+        if sigma is None: raise Exception('affinity gaussian requires sigma be specified')
+        w = eudist(fea, reps, False)
+        w = 1 / np.exp
+
 
 def svd_speed_test(mat):
 
@@ -80,18 +92,32 @@ def svd_speed_test(mat):
     print('time elapsed for scikit-learn randomized svd: {}'.format(time() - t))
     return time
 
-def test_plusplus():
-    content = scipy.io.loadmat('../data/circledata_50.mat', mat_dtype=True)
+def test_plusplus(path):
+    from time import time
+    content = scipy.io.loadmat(path, mat_dtype=True)
     fea = content['fea']
-    gnd = content['gnd'].reshape(2000)
-    _, idx = plusplus(fea, 50)
-    import matplotlib.pyplot as plt
-    color = np.zeros(shape=2000, dtype=np.int32)
-    color[idx] = 1
-    plt.scatter(fea[:,0], fea[:,1], c=color)
-    plt.show()
+    # gnd = content['gnd'].reshape(2000)
+    a = time()
+    _, idx1 = pick_representatives(fea, 1000, mode='random')
+    b = time()
+    print('time elapsed for random: {}'.format(b - a))
+    a = time()
+    _, idx2 = pick_representatives(fea, 1000, mode='++')
+    b = time()
+    print('time elapsed for ++: {}'.format(b - a))
+    # import matplotlib.pyplot as plt
+    # color = np.zeros(shape=2000, dtype=np.int32)
+    # color[idx1] = 1
+    # plt.figure(0)
+    # plt.scatter(fea[:,0], fea[:,1], c=color)
+    # color = np.zeros(shape=2000, dtype=np.int32)
+    # color[idx2] = 1
+    # plt.figure(1)
+    # plt.scatter(fea[:,0], fea[:,1], c=color)
+
+    # plt.show()
 def main():
-    test_plusplus()
+    test_plusplus('../data/news.mat')
     # mat = np.random.randn(2000, 2000)
     # svd_speed_test(mat)
     # content = scipy.io.loadmat('../data/circledata_50.mat', mat_dtype=True)

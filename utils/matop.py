@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import itertools
+import scipy.sparse as sp
 def sloweudist(A, B):
     n = np.size(A, 0)
     m = np.size(B,0)
@@ -13,14 +14,18 @@ def sloweudist(A, B):
 def eudist(A, B, sqrted=True):
     n = np.size(A, 0)
     m = np.size(B, 0)
-    a = np.sum(A ** 2, 1).reshape([n,1])
+    if sp.isspmatrix(A):
+        a = np.sum(A.multiply(A), 1).reshape([n,1])
+    else: a = np.sum(A ** 2, 1).reshape([n,1])
     AA = np.repeat(a, m, 1)
-    b = np.sum(B ** 2, 1).reshape([1,m])
+    if sp.isspmatrix(B):
+        b = np.sum(B.multiply(B), 1).reshape([m,1])
+    else: b = np.sum(B ** 2, 1).reshape([1,m])
     BB = np.repeat(b, n, 0)
-    AB = 2 * np.matmul(A, np.transpose(B))
+    AB = 2 * A.dot(B.T)
     if sqrted:
         return (AA - AB + BB) ** 0.5
-    else: return (AA - AB + BB)
+    else: return AA - AB + BB
 
 def cumdist_matrix(matrix, axis=0):
     """convert matrix to row-cumulative matrix, where each row is a cdf (last entry is 1)
