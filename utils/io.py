@@ -4,6 +4,7 @@ from utils import matop
 import scipy.sparse as sparse
 import itertools
 import utils.rand
+from scipy.optimize import linear_sum_assignment
 
 def text_feeder(path, window_size):
     f = open(path, 'rb')
@@ -95,6 +96,20 @@ def accuracy(label, ground):
     n = label.size
     return (label.flat == ground.flat).sum() / n
 
+def best_map(labels, targets):
+    """wrapper for scipy.optimize.linear_sum_assignment (which uses Hungarian algorithm, O(n^3) or O(n^4)?)
+        NOTE: It is implicit that targets and labels unique values are in range(1, k), where k is number
+            of unique labels"""
+
+    n = len(set(targets))
+    m = len(set(labels))
+    if not n == m: raise Warning('number of unique labels do not match. This will result in unassigned labels')
+    w = np.zeros((n,m), dtype=np.int64)
+    for i,j in zip(targets, labels):
+        w[i-1,j-1] -= 1
+    row_ind, col_ind = linear_sum_assignment(w)
+    corrected_labels = col_ind[labels - 1] + 1
+    return corrected_labels, w[row_ind, col_ind].sum()
 
 def make_weight_matrix(fea, mode, **kwargs):
     assert type(fea) == np.ndarray

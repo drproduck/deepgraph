@@ -2,12 +2,14 @@ import numpy as np
 from numpy.random import choice
 from numpy.linalg import svd as numpysvd
 import scipy.io
+
 from scipy.sparse.linalg import svds
 from scipy.linalg.decomp_svd import svd as scipysvd
 from sklearn.utils.extmath import randomized_svd
+
 from sklearn.cluster import KMeans, k_means_
 from time import time
-from utils.io import make_weight_matrix, greedy_matching, accuracy
+from utils.io import make_weight_matrix, greedy_matching, accuracy, best_map
 from utils.matop import eudist, cumdist_matrix
 from random import sample, choices
 import scipy.sparse as sp
@@ -42,7 +44,9 @@ def landmark_bipartite_laplacian(fea, reps, k, affinity='gaussian', sparsity=3, 
         return L, closest_rep
 
 def _svd_embedding(L, k, normalize=True, remove_first=True):
-    [u,s,v] = randomized_svd(L, n_components=k)
+    if sp.isspmatrix(L):
+        u,s,v = svds(L, k=k)
+    else: u,s,v = randomized_svd(L, n_components=k)
     v = v.T
     if remove_first:
         u = u[:,1:]
@@ -207,22 +211,22 @@ def test_bipartite_clustering(path):
     gnd = gnd.reshape(gnd.size).astype(np.int64)
     n_label = int(np.max(gnd))
     import matplotlib.pyplot as plt
-    labels = bipartite_clustering(fea, n_label, 'gaussian', n_reps=50, select_method='++',
-                                  sparsity=3, use_embedding='v', sigma=30)
+    labels = bipartite_clustering(fea, n_label, 'gaussian', n_reps=500, select_method='++',
+                                  sparsity=3, use_embedding='v', sigma=1)
     print(labels)
     print(gnd)
-    labels, diff = greedy_matching(labels, gnd)
-    plt.scatter(fea[:,0], fea[:,1], c=labels)
+    labels, diff = best_map(labels, gnd)
+    # plt.scatter(fea[:,0], fea[:,1], c=labels)
     print(labels)
     print(gnd)
     print(accuracy(labels, gnd))
-    plt.show()
+    # plt.show()
 def main():
     # test_plusplus('../data/news.mat')
     # test_spectral_clustering('../data/circledata_50.mat')
     # mat = np.random.randn(2000, 2000)
     # svd_speed_test(mat)
-    test_bipartite_clustering('../data/circledata_50.mat')
+    test_bipartite_clustering('../data/mnist.mat')
 
 
 if __name__ == '__main__':
