@@ -2,6 +2,7 @@ import numpy.testing as npt
 import numpy as np
 import unittest
 import spectralclustering.spectralclustering as sc
+import utils.io
 import scipy
 import utils
 
@@ -14,10 +15,11 @@ class test_spectral_clustering():
     def test_nearest_k_sparsity(self):
         w = np.array([[4,2,1,3,0],[6,9,8,7,5],[10,13,14,11,12]])
         w = w * 1.0
-        sw,_ = sc.nearest_k_sparsity(w, 3)
+        sw,cols = sc.nearest_k_sparsity(w, 3)
         sw = sw.toarray()
         target = np.array([[4,2,0,3,0],[0,9,8,7,0],[0,13,14,0,12]], dtype=np.float64)
         npt.assert_almost_equal(sw, target)
+        npt.assert_almost_equal(cols, np.array([[0,1,2],[3,2,1],[1,3,4]]))
 
     def test_eudist(self):
         A = np.array([[1,2,3,4],[5,6,7,8]])
@@ -28,6 +30,17 @@ class test_spectral_clustering():
         targettrue = np.array([[16],[8]])
         npt.assert_almost_equal(restrue, targettrue)
         npt.assert_almost_equal(resfalse, targetfalse)
+
+    def test_accuracy(self):
+        a = np.array([1,2,3,4,5])
+        b =  np.array([[1],[2],[3],[4],[6]])
+        npt.assert_equal(utils.io.accuracy(a,b), 0.8)
+
+    def test_greedy_matching(self):
+        a = np.array([1,1,0,0,0,1])
+        b = np.array([2,2,1,1,1,2])
+        a,_ = utils.io.greedy_matching(a,b)
+        npt.assert_equal(a, b)
 
 def main():
     w = np.arange(15).reshape(3,5)
