@@ -12,8 +12,9 @@ def sloweudist(A, B):
     return x
 
 def eudist(A, B, sqrted=True):
-    n = np.size(A, 0)
-    m = np.size(B, 0)
+    n, n2 = A.shape
+    m, m2 = B.shape
+    assert(n2 == m2)
     if sp.isspmatrix(A):
         a = np.asarray(np.sum(A.multiply(A), 1)).reshape([n,1])
     else: a = np.sum(A ** 2, 1).reshape([n,1])
