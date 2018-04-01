@@ -11,6 +11,7 @@ from utils.io import make_weight_matrix, greedy_matching
 from utils.matop import eudist, cumdist_matrix
 from random import sample, choices
 import scipy.sparse as sp
+import scipy.io as scio
 
 def _symmetric_laplacian(fea, k, mode, sigma=None):
     if mode == 'gaussian' and sigma is None:
@@ -22,14 +23,19 @@ def _symmetric_laplacian(fea, k, mode, sigma=None):
     L = (d1 * w) * d2
     return L
 
-def _landmark_bipartite_laplacian(fea, reps, k, affinity='gaussian', sigma=None):
+def _landmark_bipartite_laplacian(fea, reps, k, affinity='gaussian', sparsity=3, sigma=None):
     if affinity == 'gaussian':
         if sigma is None: raise Exception('affinity gaussian requires sigma be specified')
         w = eudist(fea, reps, False)
         w = 1.0 / np.exp(w / 2 * sigma**2)
-        d1 = (w.sum(1)**(-0.5))[:,None]
-        d2 = w.sum(0)**(-0.5)
-        L = (d1 * w) * d2
+        if sparsity is not None:
+            w = nearest_k_sparsity(w, sparsity, 'max')
+        n1, n2 = w.shape
+        d1 = w.sum(1)
+        d2 = w.sum(0)
+        d1 = sp.spdiags(d1.A1**(-0.5),m=n1,n=n1)
+        d2 = sp.spdiags(d2.A1**(-0.5),m=n2,n=n2)
+        L = d1 * w * d2
         return L
 
 def _svd_embedding(L, k, normalize=True, remove_first=True):
@@ -77,13 +83,36 @@ def  plusplus(fea, n_reps):
         # print(closest_distances[closest_distances < 0])
     return centers_idx
 
+def nearest_k_sparsity(w, sparsity = 3, max_or_min='max', save=False, toarray=False):
+    n1, n2 = w.shape
+    cols = np.zeros((sparsity, n1))
+    vals = np.zeros((sparsity, n1))
+    row_enum = np.arange(n1)
+    rows = np.tile(row_enum, (sparsity, 1))
+    if max_or_min == 'max':
+        for i in range(sparsity):
+            col_argmax = np.argmax(w, 1)
+            vals[i] = w[row_enum, col_argmax]
+            w[row_enum, col_argmax] = np.NINF
+            cols[i] = col_argmax
+    elif max_or_min == 'min':
+        for i in range(sparsity):
+            col_argmin = np.argmin(w, 1)
+            w[row_enum, col_argmin] = np.PINF
+            cols[i] = col_argmin
+    sw = sp.coo_matrix((vals.flat, (rows.flat, cols.flat)), shape=(n1, n2), dtype=np.float64).tocsr()
+    if save: scio.savemat('circledata_sparse',{'fea': sw})
+    if toarray: return sw.toarray()
+    return sw
+
+
 def spectral_clustering(fea, k, affinity, sigma=None):
     L = _symmetric_laplacian(fea, k, affinity, sigma=sigma)
     u,_,_ = _svd_embedding(L, k)
     kmeans = KMeans(n_clusters=k, init='k-means++', n_init=10, max_iter=100, n_jobs=-1)
     return kmeans.fit_predict(u)
 
-def bipartite_clustering(fea, k, affinity, n_reps=500, select_method='++', use_embedding='v', sigma=None):
+def bipartite_clustering(fea, k, affinity, n_reps=500, select_method='++', sparsity=3, use_embedding='v', sigma=None):
     reps = pick_representatives(fea, n_reps, select_method)
     L = _landmark_bipartite_laplacian(fea, reps, k, affinity, sigma)
     u,s,v = _svd_embedding(L, k)
@@ -157,6 +186,14 @@ def test_spectral_clustering(path):
     plt.scatter(fea[:,0], fea[:,1], c=labels)
     print(2000 - diff)
     plt.show()
+
+def test_bipartite_clustering(path):
+    content = scio.loadmat(path, mat_dtype=True)
+    fea =content['fea']
+    gnd = content['gnd']
+    gnd = gnd.reshape(gnd.size)
+    import matplotlib.pyplot as plt
+
 
 def main():
     # test_plusplus('../data/news.mat')
