@@ -80,17 +80,20 @@ def greedy_matching(labels, targets, in_place=False):
     labels_count = Counter(labels)
     targets_count = Counter(targets)
     labels_sort = labels_count.most_common()
+    print(labels_sort)
     targets_sort = targets_count.most_common()
+    print(targets_sort)
     mapping = dict()
     diff = 0
-    print(labels_sort)
-    print(targets_sort)
     for x, y in zip(labels_sort, targets_sort):
-        print(x[0],x[1],y[0],y[1])
         mapping[x[0]] = y[0]
         diff += abs(x[1] - y[1])
-        print(mapping)
-    return [mapping[x] for x in labels], diff
+    print(mapping)
+    return np.array([mapping[x] for x in labels]), diff
+
+def accuracy(label, ground):
+    n = label.size
+    return (label.flat == ground.flat).sum() / n
 
 
 def make_weight_matrix(fea, mode, **kwargs):

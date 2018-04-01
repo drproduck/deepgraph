@@ -20,7 +20,7 @@ def eudist(A, B, sqrted=True):
     else: a = np.sum(A ** 2, 1).reshape([n,1])
     AA = np.repeat(a, m, 1)
     if sp.isspmatrix(B):
-        b = np.asarray(np.sum(B.multiply(B), 1)).reshape([m,1])
+        b = np.asarray(np.sum(B.multiply(B), 1)).reshape([1,m])
     else: b = np.sum(B ** 2, 1).reshape([1,m])
     BB = np.repeat(b, n, 0)
     AB = 2 * A.dot(B.T)

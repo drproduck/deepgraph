@@ -7,7 +7,7 @@ from scipy.linalg.decomp_svd import svd as scipysvd
 from sklearn.utils.extmath import randomized_svd
 from sklearn.cluster import KMeans, k_means_
 from time import time
-from utils.io import make_weight_matrix, greedy_matching
+from utils.io import make_weight_matrix, greedy_matching, accuracy
 from utils.matop import eudist, cumdist_matrix
 from random import sample, choices
 import scipy.sparse as sp
@@ -16,37 +16,41 @@ import scipy.io as scio
 def _symmetric_laplacian(fea, k, mode, sigma=None):
     if mode == 'gaussian' and sigma is None:
         raise Exception('mode Gaussian requires sigma specified')
-    w = make_weight_matrix(fea, mode, sigma=sigma)
-    n = np.size(fea, 0)
+        w = make_weight_matrix(fea, mode, sigma=sigma)
+    elif mode == 'cosine':
+        ""
     d1 = (w.sum(1)**(-0.5))[:,None]
     d2 = w.sum(0)**(-0.5)
     L = (d1 * w) * d2
     return L
 
-def _landmark_bipartite_laplacian(fea, reps, k, affinity='gaussian', sparsity=3, sigma=None):
+def landmark_bipartite_laplacian(fea, reps, k, affinity='gaussian', sparsity=3, sigma=None):
     if affinity == 'gaussian':
         if sigma is None: raise Exception('affinity gaussian requires sigma be specified')
         w = eudist(fea, reps, False)
-        w = 1.0 / np.exp(w / 2 * sigma**2)
+        w = 1.0 / np.exp(w / (2 * sigma**2))
         if sparsity is not None:
-            w = nearest_k_sparsity(w, sparsity, 'max')
+            w, closest_rep = nearest_k_sparsity(w, sparsity, 'max')
         n1, n2 = w.shape
-        d1 = w.sum(1)
-        d2 = w.sum(0)
-        d1 = sp.spdiags(d1.A1**(-0.5),m=n1,n=n1)
-        d2 = sp.spdiags(d2.A1**(-0.5),m=n2,n=n2)
+        d1 = w.sum(1).A1
+        d1 = np.maximum(d1, 1e-10)
+        d2 = w.sum(0).A1
+        d2 = np.maximum(d2, 1e-10)
+        d1 = sp.spdiags(d1**(-0.5),diags=0,m=n1,n=n1)
+        d2 = sp.spdiags(d2**(-0.5),diags=0,m=n2,n=n2)
         L = d1 * w * d2
-        return L
+        return L, closest_rep
 
 def _svd_embedding(L, k, normalize=True, remove_first=True):
     [u,s,v] = randomized_svd(L, n_components=k)
-    if normalize:
-        u = u * ((u**2).sum(1)**-0.5)[:,None]
-        v = v * ((v**2).sum(1)**-0.5)[:,None]
+    v = v.T
     if remove_first:
         u = u[:,1:]
         v = v[:,1:]
         s = s[1:]
+    if normalize:
+        u = u * ((u**2).sum(1)**-0.5)[:,None]
+        v = v * ((v**2).sum(1)**-0.5)[:,None]
     return u,s,v
 
 
@@ -84,14 +88,16 @@ def  plusplus(fea, n_reps):
     return centers_idx
 
 def nearest_k_sparsity(w, sparsity = 3, max_or_min='max', save=False, toarray=False):
+    """convert a n*m matrix to a sparse n*m matrix where only {sparsity} values in each row are kept
+        :returns the sparse (CSC) matrix and cols: the original indices of maximum values"""
     n1, n2 = w.shape
-    cols = np.zeros((sparsity, n1))
+    cols = np.zeros((sparsity, n1), dtype=np.int64)
     vals = np.zeros((sparsity, n1))
     row_enum = np.arange(n1)
     rows = np.tile(row_enum, (sparsity, 1))
     if max_or_min == 'max':
         for i in range(sparsity):
-            col_argmax = np.argmax(w, 1)
+            col_argmax = np.argmax(w, 1).flat
             vals[i] = w[row_enum, col_argmax]
             w[row_enum, col_argmax] = np.NINF
             cols[i] = col_argmax
@@ -103,7 +109,9 @@ def nearest_k_sparsity(w, sparsity = 3, max_or_min='max', save=False, toarray=Fa
     sw = sp.coo_matrix((vals.flat, (rows.flat, cols.flat)), shape=(n1, n2), dtype=np.float64).tocsr()
     if save: scio.savemat('circledata_sparse',{'fea': sw})
     if toarray: return sw.toarray()
-    return sw
+    print(cols)
+    print(rows)
+    return sw, cols
 
 
 def spectral_clustering(fea, k, affinity, sigma=None):
@@ -112,15 +120,21 @@ def spectral_clustering(fea, k, affinity, sigma=None):
     kmeans = KMeans(n_clusters=k, init='k-means++', n_init=10, max_iter=100, n_jobs=-1)
     return kmeans.fit_predict(u)
 
-def bipartite_clustering(fea, k, affinity, n_reps=500, select_method='++', sparsity=3, use_embedding='v', sigma=None):
-    reps = pick_representatives(fea, n_reps, select_method)
-    L = _landmark_bipartite_laplacian(fea, reps, k, affinity, sigma)
+def bipartite_clustering(fea, k, affinity, n_reps=500, select_method='++',
+                         sparsity=3, use_embedding='v', sigma=None):
+    n1, n2 = fea.shape
+    reps,_ = pick_representatives(fea, n_reps, select_method)
+    L, nearest_rep = landmark_bipartite_laplacian(fea, reps, k, affinity, sparsity=sparsity, sigma=sigma)
     u,s,v = _svd_embedding(L, k)
     kmeans = KMeans(n_clusters=k, n_init=10, max_iter=100, n_jobs=-1)
     if use_embedding=='u':
         return kmeans.fit_predict(u)
     elif use_embedding=='v':
-        return kmeans.fit_predict(v)
+        rep_label = kmeans.fit_predict(v)
+        labels = np.zeros(n1, dtype=np.int32)
+        for i in range(n1):
+            labels[i] = rep_label[nearest_rep[0,i]]
+        return labels
     elif use_embedding=='uv':
         return kmeans.fit_predict(np.concatenate((u,v), axis=0))
 
@@ -184,22 +198,32 @@ def test_spectral_clustering(path):
     # print(np.concatenate((labels, gnd)))
     labels, diff = greedy_matching(labels, gnd)
     plt.scatter(fea[:,0], fea[:,1], c=labels)
-    print(2000 - diff)
     plt.show()
 
 def test_bipartite_clustering(path):
     content = scio.loadmat(path, mat_dtype=True)
-    fea =content['fea']
+    fea = content['fea']
     gnd = content['gnd']
-    gnd = gnd.reshape(gnd.size)
+    gnd = gnd.reshape(gnd.size).astype(np.int64)
+    n_label = int(np.max(gnd))
     import matplotlib.pyplot as plt
-
-
+    labels = bipartite_clustering(fea, n_label, 'gaussian', n_reps=50, select_method='++',
+                                  sparsity=3, use_embedding='v', sigma=30)
+    print(labels)
+    print(gnd)
+    labels, diff = greedy_matching(labels, gnd)
+    plt.scatter(fea[:,0], fea[:,1], c=labels)
+    print(labels)
+    print(gnd)
+    print(accuracy(labels, gnd))
+    plt.show()
 def main():
     # test_plusplus('../data/news.mat')
-    test_spectral_clustering('../data/circledata_50.mat')
+    # test_spectral_clustering('../data/circledata_50.mat')
     # mat = np.random.randn(2000, 2000)
     # svd_speed_test(mat)
+    test_bipartite_clustering('../data/circledata_50.mat')
+
 
 if __name__ == '__main__':
     main()
