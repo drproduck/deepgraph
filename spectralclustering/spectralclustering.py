@@ -66,6 +66,10 @@ def pick_representatives(fea, n_reps, mode='random'):
     elif mode == '++':
         idx = plusplus(fea, n_reps)
         return fea[idx,:], idx
+    elif mode == 'kmeans':
+        kmeans = KMeans(n_reps, init='random', n_init=10, max_iter=1, n_jobs=-1)
+        kmeans.fit(fea)
+        return kmeans.cluster_centers_
 
 def  plusplus(fea, n_reps):
     n1, n2 = fea.shape
