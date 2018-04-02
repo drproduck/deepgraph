@@ -4,7 +4,7 @@ from utils import matop
 import scipy.sparse as sparse
 
 def train(bf, save_dir):
-    from skipgram import SkipGram
+    from deepwalk.skipgram import SkipGram
 
     model = SkipGram(2000, 3, 128, 10, 1.00)
     model.build_graph()
@@ -23,7 +23,7 @@ def postprocess(save_dir, gnd=None):
     plt.show()
 
 def main():
-    content = scio.loadmat('/home/drproduck/Documents/circledata_50.mat', mat_dtype=True)
+    content = scio.loadmat('../data/circledata_50.mat', mat_dtype=True)
     fea = content['fea']
     gnd = content['gnd']
     SIGMA = 30
