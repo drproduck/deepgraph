@@ -1,4 +1,5 @@
 import tensorflow as tf
+from numpy import ndarray
 
 class AutoEncoder:
     def __init__(self, d_visible, d_hidden, x=None):
@@ -23,8 +24,22 @@ class AutoEncoder:
         output = self.decode(self.encode(input))
         return tf.squared_difference(output, input)
 
-    def train(self, learn_rate):
-        for i in range(num_batch):
+    def build(self):
+
+    def train(self, input, learn_rate, no_epochs, btch_size):
+        if type(input) is ndarray:
+            fea = tf.placeholder(dtype=input.dtype, shape=input.shape)
+            dataset = tf.data.Dataset.from_tensor_slices(fea).batch(batch_size=btch_size)
+            iterator = dataset.make_initializable_iterator()
+            next_batch = iterator.get_next()
+            with tf.Session() as sess:
+                avg_loss = 0
+                for i in range(no_epochs):
+                    sess.run(iterator.initializer, feed_dict={fea: input})
+                    try:
+                        infer_loss = loss(input)
+
+
 
         train_op = tf.train.AdamOptimizer(learning_rate=learn_rate).minimize(self.loss())
 
