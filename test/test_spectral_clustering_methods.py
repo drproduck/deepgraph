@@ -7,6 +7,14 @@ import scipy
 import utils
 
 class test_spectral_clustering():
+    def test_symmetric_laplacian(self):
+        w = np.arange(15).reshape(3,5)
+        actual = np.array( [[0.        , 0.0745356 , 0.13801311, 0.19364917, 0.24343225],
+                            [0.21821789, 0.23904572, 0.25819889, 0.27602622, 0.29277002],
+                            [0.33333333, 0.33471934, 0.3380617 , 0.34258008, 0.3478328 ]])
+
+        npt.assert_almost_equal(sc.symmetric_laplacian(w), actual)
+
     def test_repeat(self):
         row = np.array([0,1,2,3,4], dtype=np.float64)
         row3 = np.tile(row, (3,1))

@@ -114,7 +114,9 @@ def best_map(labels, targets):
 def make_weight_matrix(fea, mode, **kwargs):
     assert type(fea) == np.ndarray
     if mode == 'gaussian':
+        #make weight matrix (faster version)
         w = matop.eudist(fea, fea, False)
+        #use gaussian affinity
         w = np.exp(-w / (2 * kwargs['sigma'] ** 2))
     elif mode == 'cosine':
         fea = fea / (np.sum(fea ** 2, 1) ** 0.5).reshape([np.size(fea, 0), 1])

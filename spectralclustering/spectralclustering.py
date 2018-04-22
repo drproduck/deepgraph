@@ -15,14 +15,14 @@ from random import sample, choices
 import scipy.sparse as sp
 import scipy.io as scio
 
-def _symmetric_laplacian(fea, k, mode, sigma=None):
-    if mode == 'gaussian' and sigma is None:
-        raise Exception('mode Gaussian requires sigma specified')
-        w = make_weight_matrix(fea, mode, sigma=sigma)
-    elif mode == 'cosine':
-        ""
-    d1 = (w.sum(1)**(-0.5))[:,None]
-    d2 = w.sum(0)**(-0.5)
+def symmetric_laplacian(w):
+    """normalized laplacian based on bipartite graph"""
+
+    n,m = w.shape
+    d1 = w.sum(axis=1) ** (-0.5)
+    d1 = d1.reshape(n,1)
+    d2 = w.sum(axis=0) ** (-0.5)
+    d2 = d2.reshape(1,m)
     L = (d1 * w) * d2
     return L
 
@@ -123,7 +123,8 @@ def nearest_k_sparsity(w, sparsity = 3, max_or_min='max', save=False, toarray=Fa
 
 
 def spectral_clustering(fea, k, affinity, sigma=None):
-    L = _symmetric_laplacian(fea, k, affinity, sigma=sigma)
+    w = make_weight_matrix(fea, mode='gaussian', sigma=sigma)
+    L = symmetric_laplacian(w)
     u,_,_ = _svd_embedding(L, k)
     kmeans = KMeans(n_clusters=k, init='k-means++', n_init=10, max_iter=100, n_jobs=-1)
     return kmeans.fit_predict(u)
