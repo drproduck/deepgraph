@@ -7,38 +7,52 @@ import numpy as np
 import magenta as mgt
 from tensorflow.examples.tutorials.mnist import input_data
 from magenta.models.image_stylization.image_utils import form_image_grid
+
 class AutoEncoder:
     def __init__(self, d_visible, d_hidden, x_dtype=None):
         self.d_visible = d_visible
         self.d_hidden = d_hidden
         self.fea = tf.placeholder(dtype=x_dtype, shape=[None, d_visible])
         self.learn_rate = tf.placeholder(dtype=tf.float32)
-    def _make_encoder(self):
+
+    def _make_encoder(self, layerdims):
+        if layerdims is None:
+            layerdims = [self.d_visible, self.d_hidden]
+        else: layerdims = [self.d_visible] + layerdims + [self.d_hidden]
         with tf.name_scope('encode'):
-            w = tf.Variable(name='w',
-                            initial_value=tf.random_normal(shape=[self.d_visible, self.d_hidden],
-                                             mean=0.0,
-                                             stddev=(2.0/(self.d_visible+self.d_hidden))**0.5)
-                            )
-            b = tf.Variable(name='b',
-                            initial_value=tf.constant(value=0.0, shape=[self.d_hidden])
-                            )
-            self.encode = tf.nn.sigmoid(tf.matmul(self.fea,w)+b)
+            self.encode = self.fea
+            for i in range(len(layerdims) - 1):
+                dim1 = layerdims[i]; dim2 = layerdims[i+1]
+                w = tf.Variable(name='w'+str(i),
+                                initial_value=tf.random_normal(shape=[dim1, dim2],
+                                                 mean=0.0,
+                                                 stddev=(2.0/(dim1 + dim2))**0.5)
+                                )
+                b = tf.Variable(name='b'+str(i),
+                                initial_value=tf.constant(value=0.0, shape=[dim2])
+                                )
+                self.encode = tf.nn.relu(tf.matmul(self.encode,w)+b)
 
     def code(self,x):
         return self.sess.run(self.encode, feed_dict={self.fea: x})
 
-    def _make_decoder(self):
+    def _make_decoder(self, layerdims):
+        if layerdims is None:
+            layerdims = [self.d_hidden, self.d_visible]
+        else: layerdims = [self.d_hidden] + layerdims + [self.d_visible]
         with tf.name_scope('decode'):
-            w = tf.Variable(name='w',
-                            initial_value=tf.random_normal(shape=[self.d_hidden, self.d_visible],
-                                             mean=0.0,
-                                             stddev=(2.0/(self.d_visible+self.d_hidden))**0.5)
-                            )
-            b = tf.Variable(name='b',
-                            initial_value=tf.constant(value=0.0,shape=[self.d_visible])
-                            )
-            self.decode = tf.nn.sigmoid(tf.matmul(self.encode,w)+b)
+            self.decode = self.encode
+            for i in range(len(layerdims) - 1):
+                dim1 = layerdims[i]; dim2 = layerdims[i+1]
+                w = tf.Variable(name='w'+str(i),
+                                    initial_value=tf.random_normal(shape=[dim1, dim2],
+                                                 mean=0.0,
+                                                 stddev=(2.0/(dim1 + dim2))**0.5)
+                                )
+                b = tf.Variable(name='b'+str(i),
+                                initial_value=tf.constant(value=0.0,shape=[dim2])
+                                )
+                self.decode = tf.nn.relu(tf.matmul(self.decode,w)+b)
 
     def _create_loss(self):
         with tf.name_scope('loss'):
@@ -56,11 +70,12 @@ class AutoEncoder:
         layer_grid_summary("Output", self.decode, [28, 28])
         return writer, tf.summary.merge_all()
 
-    def build(self):
-        self._make_encoder()
-        self._make_decoder()
+    def build(self, encoder_dims, decoder_dims):
+        self._make_encoder(encoder_dims)
+        self._make_decoder(decoder_dims)
         self._create_loss()
         self._optimize()
+        self._make_summaries()
 
     def train(self, input, learn_rate, no_epochs, batch_size):
 
@@ -93,21 +108,20 @@ class AutoEncoder:
         print('total time elapsed = {}'.format(t3))
         print(self.sess.run(self.encode, feed_dict={self.fea: input}))
 
-    def train_mnist(self, batch_size):
+    def train_mnist(self, learn_rate, no_epochs, batch_size):
         mnist = input_data.read_data_sets('MNIST_data')
         writer, summary_op = self._make_summaries()
         first_batch = mnist.train.next_batch(batch_size)
 
         sess = tf.Session()
-        sess.run(tf.global_variables_initializer)
+        sess.run(tf.global_variables_initializer())
         sess.run(make_image("images/input.jpg", self.fea, [28, 28]), feed_dict={self.fea :
                                                                              first_batch[0]})
-        for i in range(int(200001)):
-            batch = mnist.train.next_batch(BATCH_SIZE)
-            feed = {self.fea : batch[0]}
+        for i in range(no_epochs):
+            batch = mnist.train.next_batch(batch_size)
             if i % 500 == 0:
                 summary, train_loss = sess.run([summary_op, self.loss],
-                                               feed_dict=feed)
+                                               feed_dict={self.fea: batch[0]})
                 print("step %d, training loss: %g" % (i, train_loss))
 
                 writer.add_summary(summary, i)
@@ -115,17 +129,17 @@ class AutoEncoder:
 
             if i % 1000 == 0:
                 sess.run(make_image("images/output_%06i.jpg" % i, self.decode, [28,
-                                                                           28]), feed_dict={x : first_batch[0]})
-            self.optimizer.run(feed_dict=feed)
+                                                                           28]), feed_dict={self.fea : first_batch[0]})
+            sess.run(self.optimizer, feed_dict={self.fea: batch[0], self.learn_rate: learn_rate})
 
         # Save latent space
-        pred = sess.run(latent, feed_dict={x : mnist.test._images})
+        pred = sess.run(self.encode, feed_dict={self.fea : mnist.test._images})
         pred = np.asarray(pred)
         pred = np.reshape(pred, (mnist.test._num_examples, 2))
         labels = np.reshape(mnist.test._labels, (mnist.test._num_examples, 1))
         pred = np.hstack((pred, labels))
 
-        np.savetxt(fname, pred)
+        np.savetxt("latent.csv", pred)
 
     def close_sess(self):
         self.sess.close()
@@ -147,13 +161,16 @@ class SpectralEncoder(AutoEncoder):
                             )
             self.decode = tf.tanh(tf.matmul(self.encode, w, transpose_b=True) + b)
 
+    def build(self):
+
     def train(self,input, learn_rate, no_epochs, batch_size, normalized_weight=True, sigma=None):
 
         if normalized_weight:
-            super(SpectralEncoder).train(input, learn_rate,no_epochs, batch_size)
+            super().train(input, learn_rate,no_epochs, batch_size)
         else:
             input = self.make_normalized_affinity(input, sigma)
-            super(SpectralEncoder).train(input, learn_rate,no_epochs,batch_size)
+            super().train(input, learn_rate,no_epochs,batch_size)
+
 
 def test_autoencoder_circledata():
     import scipy.io
@@ -182,8 +199,8 @@ BATCH_SIZE = 50
 
 def layer_grid_summary(name, var, image_dims):
     prod = np.prod(image_dims)
-    grid = form_image_grid(tf.reshape(var, [BATCH_SIZE, prod], [GRID_ROWS,
-                                                                GRID_COLS], image_dims, 1))
+    grid = form_image_grid(tf.reshape(var, [BATCH_SIZE, prod]), [GRID_ROWS,
+                                                                GRID_COLS], image_dims, 1)
     return tf.summary.image(name, grid)
 
 def make_image(name, var, image_dims):
@@ -225,13 +242,15 @@ def make_image(name, var, image_dims):
 
 
 def test_autoencoder_mnist():
-
-
-
+    AE = AutoEncoder(d_visible=784, d_hidden=2, x_dtype=tf.float32)
+    AE.build(encoder_dims=[50,50], decoder_dims=[50,50])
+    AE.train_mnist(learn_rate=1e-2, no_epochs=50000, batch_size=BATCH_SIZE)
 
 def test_spectralencoder():
     """"""
+
 def main():
-    test_autoencoder_circledata()
+    test_autoencoder_mnist()
+
 if __name__ == '__main__':
     main()
