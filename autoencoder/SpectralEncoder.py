@@ -152,24 +152,37 @@ class SpectralEncoder(AutoEncoder):
         dwd = sc.symmetric_laplacian(w)
         return dwd
 
-    def _make_decoder(self):
-        with tf.name_scope('encode'):
-            w = tf.get_variable('w')
-        with tf.name_scope('decode'):
-            b = tf.Variable(name='b',
-                            initial_value=tf.constant(value=0.0,shape=[self.d_visible])
-                            )
-            self.decode = tf.tanh(tf.matmul(self.encode, w, transpose_b=True) + b)
+    def _make_decoder(self, layerdims):
+        """decoder reverse order of encoder's weights"""
+        if layerdims is None:
+            layerdims = [self.d_visible, self.d_hidden]
+        else: layerdims = [self.d_visible] + layerdims + [self.d_hidden]
+        self.decode = self.encode
+        for i in reversed(range(len(layerdims) - 1)):
 
-    def build(self):
+            #tied weight with encoder
+            with tf.name_scope('encode'):
+                w = tf.get_variable('w'+str(i))
+            with tf.name_scope('decode'):
+                b = tf.Variable(name='b'+str(i),
+                                initial_value=tf.constant(value=0.0,shape=[layerdims[i]])
+                                )
+                self.decode = tf.tanh(tf.matmul(self.decode, w, transpose_b=True) + b)
+
+    def build(self, layerdims):
+        self._make_encoder(layerdims)
+        self._make_decoder(layerdims)
+        self._create_loss()
+        self._optimize()
+        self._make_summaries()
 
     def train(self,input, learn_rate, no_epochs, batch_size, normalized_weight=True, sigma=None):
 
         if normalized_weight:
             super().train(input, learn_rate,no_epochs, batch_size)
         else:
-            input = self.make_normalized_affinity(input, sigma)
-            super().train(input, learn_rate,no_epochs,batch_size)
+            normed_input = self.make_normalized_affinity(input, sigma)
+            super().train(normed_input, learn_rate,no_epochs,batch_size)
 
 
 def test_autoencoder_circledata():
