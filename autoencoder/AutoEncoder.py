@@ -4,7 +4,6 @@ import time
 import utils.io
 import spectralclustering.spectralclustering as sc
 import numpy as np
-import magenta as mgt
 from tensorflow.examples.tutorials.mnist import input_data
 from magenta.models.image_stylization.image_utils import form_image_grid
 
@@ -15,7 +14,12 @@ class AutoEncoder:
         self.fea = tf.placeholder(dtype=x_dtype, shape=[None, d_visible])
         self.learn_rate = tf.placeholder(dtype=tf.float32)
 
-    def _make_encoder(self, layerdims):
+    @staticmethod
+    def build_and_train(self, x, hidden_layer):
+        
+
+
+    def _make_encoder(self, layerdims=None):
         if layerdims is None:
             layerdims = [self.d_visible, self.d_hidden]
         else: layerdims = [self.d_visible] + layerdims + [self.d_hidden]
@@ -36,7 +40,7 @@ class AutoEncoder:
     def code(self,x):
         return self.sess.run(self.encode, feed_dict={self.fea: x})
 
-    def _make_decoder(self, layerdims):
+    def _make_decoder(self, layerdims=None):
         if layerdims is None:
             layerdims = [self.d_hidden, self.d_visible]
         else: layerdims = [self.d_hidden] + layerdims + [self.d_visible]
@@ -73,6 +77,13 @@ class AutoEncoder:
     def build(self, encoder_dims, decoder_dims):
         self._make_encoder(encoder_dims)
         self._make_decoder(decoder_dims)
+        self._create_loss()
+        self._optimize()
+        self._make_summaries()
+
+    def build_simple(self):
+        self._make_encoder()
+        self._make_decoder()
         self._create_loss()
         self._optimize()
         self._make_summaries()
@@ -144,7 +155,10 @@ class AutoEncoder:
     def close_sess(self):
         self.sess.close()
 
-class SpectralEncoder(AutoEncoder):
+class DenoisingAE(AutoEncoder):
+    """Denoising Auto Encoder"""
+
+class SpectralAE(AutoEncoder):
 
     @staticmethod
     def make_normalized_affinity(self, input, sigma):
