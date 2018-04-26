@@ -6,6 +6,7 @@ import spectralclustering.spectralclustering as sc
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 from magenta.models.image_stylization.image_utils import form_image_grid
+import nnutils as nn
 
 class AutoEncoder:
     def __init__(self, d_visible, d_hidden, x_dtype=None):
@@ -15,8 +16,18 @@ class AutoEncoder:
         self.learn_rate = tf.placeholder(dtype=tf.float32)
 
     @staticmethod
-    def build_and_train(self, x, hidden_layer):
-        
+    def build_and_train(self, x, iterator, d_hidden, d_visible, activation=tf.nn.sigmoid, tied_weight=True):
+        """quickly train provided layers and return weight and bias associated with the hidden layer"""
+        w_vis, b_vis, layer_h = nn.fclayer(w_s=[d_visible, d_hidden], b_s=[d_hidden], activation=activation)
+        b_h = tf.Variable(tf.constant(value=0.0, shape=[d_visible]))
+        if tied_weight:
+            output = activation(tf.matmul(layer_h,w_vis, transpose_b=True) + )
+        else:
+            w_h = nn.weight([d_hidden, d_visible])
+            output = activation(tf.matmul(x,w_h) + b_h)
+
+        loss = tf.reduce_mean(tf.squared_difference(output, x))
+        optimizer = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=[w,b,w_h,b_h])
 
 
     def _make_encoder(self, layerdims=None):
