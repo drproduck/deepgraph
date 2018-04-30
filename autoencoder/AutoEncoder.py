@@ -16,19 +16,29 @@ class AutoEncoder:
         self.learn_rate = tf.placeholder(dtype=tf.float32)
 
     @staticmethod
-    def build_and_train(self, x, iterator, d_hidden, d_visible, activation=tf.nn.sigmoid, tied_weight=True):
-        """quickly train provided layers and return weight and bias associated with the hidden layer"""
-        w_vis, b_vis, layer_h = nn.fclayer(w_s=[d_visible, d_hidden], b_s=[d_hidden], activation=activation)
-        b_h = tf.Variable(tf.constant(value=0.0, shape=[d_visible]))
+    def build_autoencoder(d_hidden, d_visible, activation=tf.nn.sigmoid, tied_weight=True, corrupt_level=None):
+        """build an autoencoder and return its parameters without training
+        :returns optimizer, w_vis, b_vis"""
+        x = tf.placeholder(shape=[None,d_visible],dtype=tf.float32)
+        layer_h, w_vis, b_vis = nn.fclayer(x=x, w_s=[d_visible, d_hidden], b_s=[d_hidden], activation=activation)
         if tied_weight:
-            output = activation(tf.matmul(layer_h,w_vis, transpose_b=True) + )
+            b_h = tf.Variable(tf.constant(value=0.0, shape=[d_visible]))
+            output = activation(tf.matmul(layer_h, w_vis, transpose_b=True) + b_h)
+            loss = tf.reduce_mean(tf.squared_difference(output, x))
+            optimizer = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=[w_vis,b_vis,b_h])
         else:
-            w_h = nn.weight([d_hidden, d_visible])
-            output = activation(tf.matmul(x,w_h) + b_h)
-
-        loss = tf.reduce_mean(tf.squared_difference(output, x))
-        optimizer = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=[w,b,w_h,b_h])
-
+            output, w_h, b_h  = nn.fclayer(x=layer_h, w_s=[d_hidden,d_visible], b_s=[d_visible],activation=activation)
+            loss = tf.reduce_mean(tf.squared_difference(output, x))
+            optimizer = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=[w_vis,b_vis,w_h,b_h])
+        def ae_trainer(next_op, sess):
+            while True:
+                try:
+                    next_batch = sess.run(next_op)
+                    next_batch_corrupted = nn.corrupt_input(next_batch, corrupt_level=corrupt_level)
+                    optimizer.run(feed_dict={x: next_batch_corrupted}, session=sess)
+                except tf.errors.OutOfRangeError:
+                    break
+        return ae_trainer, w_vis, b_vis
 
     def _make_encoder(self, layerdims=None):
         if layerdims is None:
@@ -165,9 +175,6 @@ class AutoEncoder:
 
     def close_sess(self):
         self.sess.close()
-
-class DenoisingAE(AutoEncoder):
-    """Denoising Auto Encoder"""
 
 class SpectralAE(AutoEncoder):
 
