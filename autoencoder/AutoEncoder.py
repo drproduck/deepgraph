@@ -17,36 +17,27 @@ class AutoEncoder:
         self.encoder = None
         self.decoder = None
         self.loss = None
-        self.learn_rate = 0.01
         self.optimizer = None
 
     @staticmethod
     def build_autoencoder(d_hidden, d_visible, activation=tf.nn.sigmoid, tied_weight=True, corrupt_level=None):
-        """build an autoencoder and return its parameters without training
-        :returns optimizer, w_vis, b_vis"""
-        tinyAE = AutoEncoder(d_visible, d_hidden)
-         
-        x = tf.placeholder(shape=[None,d_visible],dtype=tf.float32)
-        layer_h, w_vis, b_vis = nn.fclayer(x=x, w_s=[d_visible, d_hidden], b_s=[d_hidden], activation=activation)
+        """build a basic auto encoder with 1 hidden layer. Good for training multiple stacked autoencoders
+        :return an instance of AutoEncoder"""
+        ae = AutoEncoder(d_visible, d_hidden)
+
+        ae.fea = tf.placeholder(shape=[None,d_visible],dtype=tf.float32)
+        ae.encoder, w_vis, b_vis = nn.fclayer(x=ae.fea, w_s=[d_visible, d_hidden], b_s=[d_hidden], activation=activation)
         if tied_weight:
             b_h = tf.Variable(tf.constant(value=0.0, shape=[d_visible]))
-            output = activation(tf.matmul(layer_h, w_vis, transpose_b=True) + b_h)
-            loss = tf.reduce_mean(tf.squared_difference(output, x))
-            optimizer = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=[w_vis,b_vis,b_h])
+            ae.decoder = activation(tf.matmul(ae.encoder, w_vis, transpose_b=True) + b_h)
+            ae.loss = tf.reduce_mean(tf.squared_difference(ae.decoder, ae.fea))
+            ae.optimizer = tf.train.AdamOptimizer(0.01).minimize(ae.loss, var_list=[w_vis,b_vis,b_h])
         else:
-            output, w_h, b_h  = nn.fclayer(x=layer_h, w_s=[d_hidden,d_visible], b_s=[d_visible],activation=activation)
-            loss = tf.reduce_mean(tf.squared_difference(output, x))
-            optimizer = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=[w_vis,b_vis,w_h,b_h])
+            ae.decoder, w_h, b_h  = nn.fclayer(x=ae.encoder, w_s=[d_hidden,d_visible], b_s=[d_visible],activation=activation)
+            ae.loss = tf.reduce_mean(tf.squared_difference(ae.decoder, ae.fea))
+            ae.optimizer = tf.train.AdamOptimizer(0.01).minimize(ae.loss, var_list=[w_vis,b_vis,w_h,b_h])
 
-        def ae_trainer(next_op, sess):
-            while True:
-                try:
-                    next_batch = sess.run(next_op)
-                    next_batch_corrupted = nn.corrupt_input(next_batch, corrupt_level=corrupt_level)
-                    optimizer.run(feed_dict={x: next_batch_corrupted}, session=sess)
-                except tf.errors.OutOfRangeError:
-                    break
-        return ae_trainer, w_vis, b_vis
+        return ae, w_vis, b_vis
 
     def _make_encoder(self, layerdims=None):
         if layerdims is None:
@@ -119,7 +110,7 @@ class AutoEncoder:
         if summarize:
             self._make_summaries()
 
-    def train(self, input, learn_rate, no_epochs, batch_size):
+    def train(self, input, learn_rate, no_epochs, batch_size, global_session=None, corrupt_level=None):
 
         assert type(input) is ndarray
         feature = tf.placeholder(dtype=input.dtype, shape=input.shape)
@@ -127,17 +118,23 @@ class AutoEncoder:
         iterator = dataset.make_initializable_iterator()
         next_batch = iterator.get_next()
 
-        self.sess = tf.Session()
+        # corrupt input
+        if corrupt_level is not None:
+            next_batch = nn.corrupt_input(next_batch, corrupt_level=corrupt_level)
+
+        if global_session is None:
+            sess = tf.Session()
+        else: sess = global_session
         avg_loss = 0
         t3 = 0
-        self.sess.run(tf.global_variables_initializer())
+        sess.run(tf.global_variables_initializer())
         for i in range(no_epochs):
             t1 = time.time()
-            self.sess.run(iterator.initializer, feed_dict={feature: input})
+            sess.run(iterator.initializer, feed_dict={feature: input})
             while True:
                 try:
-                    batch =  self.sess.run(next_batch)
-                    batch_infer_loss,_ = self.sess.run([self.loss, self.optimizer],
+                    batch =  sess.run(next_batch)
+                    batch_infer_loss,_ = sess.run([self.loss, self.optimizer],
                                                 feed_dict={self.fea: batch,
                                                            self.learn_rate: learn_rate})
                     avg_loss += batch_infer_loss / input.shape[0]
@@ -148,8 +145,11 @@ class AutoEncoder:
                     avg_loss = 0
                     break
         print('total time elapsed = {}'.format(t3))
-        print(self.sess.run(self.encoder, feed_dict={self.fea: input}))
+        print(sess.run(self.encoder, feed_dict={self.fea: input}))
 
+
+
+    # some test functions
     def train_mnist(self, learn_rate, no_epochs, batch_size):
         mnist = input_data.read_data_sets('MNIST_data')
         writer, summary_op = self._make_summaries()
