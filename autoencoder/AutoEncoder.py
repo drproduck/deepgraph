@@ -9,16 +9,23 @@ from magenta.models.image_stylization.image_utils import form_image_grid
 import nnutils as nn
 
 class AutoEncoder:
-    def __init__(self, d_visible, d_hidden, x_dtype=None):
+    def __init__(self, d_visible, d_hidden):
         self.d_visible = d_visible
         self.d_hidden = d_hidden
-        self.fea = tf.placeholder(dtype=x_dtype, shape=[None, d_visible])
+        self.fea = tf.placeholder(dtype=tf.float32, shape=[None, d_visible])
         self.learn_rate = tf.placeholder(dtype=tf.float32)
+        self.encoder = None
+        self.decoder = None
+        self.loss = None
+        self.learn_rate = 0.01
+        self.optimizer = None
 
     @staticmethod
     def build_autoencoder(d_hidden, d_visible, activation=tf.nn.sigmoid, tied_weight=True, corrupt_level=None):
         """build an autoencoder and return its parameters without training
         :returns optimizer, w_vis, b_vis"""
+        tinyAE = AutoEncoder(d_visible, d_hidden)
+         
         x = tf.placeholder(shape=[None,d_visible],dtype=tf.float32)
         layer_h, w_vis, b_vis = nn.fclayer(x=x, w_s=[d_visible, d_hidden], b_s=[d_hidden], activation=activation)
         if tied_weight:
@@ -30,6 +37,7 @@ class AutoEncoder:
             output, w_h, b_h  = nn.fclayer(x=layer_h, w_s=[d_hidden,d_visible], b_s=[d_visible],activation=activation)
             loss = tf.reduce_mean(tf.squared_difference(output, x))
             optimizer = tf.train.AdamOptimizer(0.01).minimize(loss, var_list=[w_vis,b_vis,w_h,b_h])
+
         def ae_trainer(next_op, sess):
             while True:
                 try:
@@ -45,7 +53,7 @@ class AutoEncoder:
             layerdims = [self.d_visible, self.d_hidden]
         else: layerdims = [self.d_visible] + layerdims + [self.d_hidden]
         with tf.name_scope('encode'):
-            self.encode = self.fea
+            self.encoder = self.fea
             for i in range(len(layerdims) - 1):
                 dim1 = layerdims[i]; dim2 = layerdims[i+1]
                 w = tf.Variable(name='w'+str(i),
@@ -56,17 +64,17 @@ class AutoEncoder:
                 b = tf.Variable(name='b'+str(i),
                                 initial_value=tf.constant(value=0.0, shape=[dim2])
                                 )
-                self.encode = tf.nn.relu(tf.matmul(self.encode,w)+b)
+                self.encoder = tf.nn.relu(tf.matmul(self.encoder, w) + b)
 
-    def code(self,x):
-        return self.sess.run(self.encode, feed_dict={self.fea: x})
+    def encode(self,x):
+        return self.sess.run(self.encoder, feed_dict={self.fea: x})
 
     def _make_decoder(self, layerdims=None):
         if layerdims is None:
             layerdims = [self.d_hidden, self.d_visible]
         else: layerdims = [self.d_hidden] + layerdims + [self.d_visible]
         with tf.name_scope('decode'):
-            self.decode = self.encode
+            self.decoder = self.encoder
             for i in range(len(layerdims) - 1):
                 dim1 = layerdims[i]; dim2 = layerdims[i+1]
                 w = tf.Variable(name='w'+str(i),
@@ -77,11 +85,11 @@ class AutoEncoder:
                 b = tf.Variable(name='b'+str(i),
                                 initial_value=tf.constant(value=0.0,shape=[dim2])
                                 )
-                self.decode = tf.nn.relu(tf.matmul(self.decode,w)+b)
+                self.decoder = tf.nn.relu(tf.matmul(self.decoder, w) + b)
 
     def _create_loss(self):
         with tf.name_scope('loss'):
-            self.loss = tf.reduce_mean(tf.squared_difference(self.fea, self.decode))
+            self.loss = tf.reduce_mean(tf.squared_difference(self.fea, self.decoder))
 
     def _optimize(self):
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learn_rate).minimize(self.loss)
@@ -91,23 +99,25 @@ class AutoEncoder:
         writer = tf.summary.FileWriter("./logs")
         tf.summary.scalar("Loss", self.loss)
         layer_grid_summary("Input", self.fea, [28, 28])
-        layer_grid_summary("Encoder", self.encode, [2, 1])
-        layer_grid_summary("Output", self.decode, [28, 28])
+        layer_grid_summary("Encoder", self.encoder, [2, 1])
+        layer_grid_summary("Output", self.decoder, [28, 28])
         return writer, tf.summary.merge_all()
 
-    def build(self, encoder_dims, decoder_dims):
+    def build(self, encoder_dims, decoder_dims, summarize=False):
         self._make_encoder(encoder_dims)
         self._make_decoder(decoder_dims)
         self._create_loss()
         self._optimize()
-        self._make_summaries()
+        if summarize:
+            self._make_summaries()
 
-    def build_simple(self):
+    def build_simple(self, summarize=False):
         self._make_encoder()
         self._make_decoder()
         self._create_loss()
         self._optimize()
-        self._make_summaries()
+        if summarize:
+            self._make_summaries()
 
     def train(self, input, learn_rate, no_epochs, batch_size):
 
@@ -138,7 +148,7 @@ class AutoEncoder:
                     avg_loss = 0
                     break
         print('total time elapsed = {}'.format(t3))
-        print(self.sess.run(self.encode, feed_dict={self.fea: input}))
+        print(self.sess.run(self.encoder, feed_dict={self.fea: input}))
 
     def train_mnist(self, learn_rate, no_epochs, batch_size):
         mnist = input_data.read_data_sets('MNIST_data')
@@ -160,12 +170,12 @@ class AutoEncoder:
                 writer.flush()
 
             if i % 1000 == 0:
-                sess.run(make_image("images/output_%06i.jpg" % i, self.decode, [28,
-                                                                           28]), feed_dict={self.fea : first_batch[0]})
+                sess.run(make_image("images/output_%06i.jpg" % i, self.decoder, [28,
+                                                                                 28]), feed_dict={self.fea : first_batch[0]})
             sess.run(self.optimizer, feed_dict={self.fea: batch[0], self.learn_rate: learn_rate})
 
         # Save latent space
-        pred = sess.run(self.encode, feed_dict={self.fea : mnist.test._images})
+        pred = sess.run(self.encoder, feed_dict={self.fea : mnist.test._images})
         pred = np.asarray(pred)
         pred = np.reshape(pred, (mnist.test._num_examples, 2))
         labels = np.reshape(mnist.test._labels, (mnist.test._num_examples, 1))
@@ -189,7 +199,7 @@ class SpectralAE(AutoEncoder):
         if layerdims is None:
             layerdims = [self.d_visible, self.d_hidden]
         else: layerdims = [self.d_visible] + layerdims + [self.d_hidden]
-        self.decode = self.encode
+        self.decode = self.encoder
         for i in reversed(range(len(layerdims) - 1)):
 
             #tied weight with encoder
