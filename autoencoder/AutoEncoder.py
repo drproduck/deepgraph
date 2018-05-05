@@ -20,7 +20,7 @@ class AutoEncoder:
         self.optimizer = None
 
     @staticmethod
-    def build_autoencoder(d_hidden, d_visible, activation=tf.nn.sigmoid, tied_weight=True, corrupt_level=None):
+    def build_autoencoder(d_visible, d_hidden, activation=tf.nn.sigmoid, tied_weight=True, corrupt_level=None):
         """build a basic auto encoder with 1 hidden layer. Good for training multiple stacked autoencoders
         :return an instance of AutoEncoder"""
         ae = AutoEncoder(d_visible, d_hidden)
@@ -57,8 +57,8 @@ class AutoEncoder:
                                 )
                 self.encoder = tf.nn.relu(tf.matmul(self.encoder, w) + b)
 
-    def encode(self,x):
-        return self.sess.run(self.encoder, feed_dict={self.fea: x})
+    def encode(self,x, global_session):
+        return global_session.run(self.encoder, feed_dict={self.fea: x})
 
     def _make_decoder(self, layerdims=None):
         if layerdims is None:
@@ -112,7 +112,7 @@ class AutoEncoder:
 
     def train(self, input, learn_rate, no_epochs, batch_size, global_session=None, corrupt_level=None):
 
-        assert type(input) is ndarray
+        assert type(input) is np.ndarray
         feature = tf.placeholder(dtype=input.dtype, shape=input.shape)
         dataset = tf.data.Dataset.from_tensor_slices(feature).batch(batch_size=batch_size)
         iterator = dataset.make_initializable_iterator()
