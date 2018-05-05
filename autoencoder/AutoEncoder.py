@@ -1,7 +1,7 @@
 import tensorflow as tf
 from numpy import ndarray
 import time
-import utils.io
+import util.io
 import spectralclustering.spectralclustering as sc
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
@@ -118,10 +118,6 @@ class AutoEncoder:
         iterator = dataset.make_initializable_iterator()
         next_batch = iterator.get_next()
 
-        # corrupt input
-        if corrupt_level is not None:
-            next_batch = nn.corrupt_input(next_batch, corrupt_level=corrupt_level)
-
         if global_session is None:
             sess = tf.Session()
         else: sess = global_session
@@ -134,6 +130,9 @@ class AutoEncoder:
             while True:
                 try:
                     batch =  sess.run(next_batch)
+                    # corrupt input
+                    if corrupt_level is not None:
+                        batch = nn.corrupt_input(batch, corrupt_level=corrupt_level)
                     batch_infer_loss,_ = sess.run([self.loss, self.optimizer],
                                                 feed_dict={self.fea: batch,
                                                            self.learn_rate: learn_rate})
@@ -190,7 +189,7 @@ class SpectralAE(AutoEncoder):
 
     @staticmethod
     def make_normalized_affinity(self, input, sigma):
-        w = utils.io.make_weight_matrix(input, 'gaussian', sigma=sigma)
+        w = util.io.make_weight_matrix(input, 'gaussian', sigma=sigma)
         dwd = sc.symmetric_laplacian(w)
         return dwd
 

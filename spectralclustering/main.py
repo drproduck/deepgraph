@@ -5,7 +5,7 @@ import scipy
 import scipy.io as scio
 from sklearn.utils.extmath import randomized_svd
 from spectralclustering import spectralclustering as sc
-import utils.io as process
+import util.io as process
 
 def svd_speed_test(mat):
 

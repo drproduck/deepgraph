@@ -1,9 +1,9 @@
 import numpy as np
 
-import utils
+import util
 mat = np.loadtxt('karate.txt')
 n = np.size(mat, 0)
-bf = utils.batch_feeder('../data/karate.txt',mode='cum_graph', batch_size=256, window_size=10)
+bf = util.batch_feeder('../data/karate.txt', mode='cum_graph', batch_size=256, window_size=10)
 context, target = next(bf)
 print(context, target)
 

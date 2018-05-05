@@ -2,9 +2,9 @@ import numpy.testing as npt
 import numpy as np
 import unittest
 import spectralclustering.spectralclustering as sc
-import utils.io
+import util.io
 import scipy
-import utils
+import util
 
 class test_spectral_clustering():
     def test_symmetric_laplacian(self):
@@ -32,8 +32,8 @@ class test_spectral_clustering():
     def test_eudist(self):
         A = np.array([[1,2,3,4],[5,6,7,8]])
         B = np.array([[9,10,11,12]])
-        resfalse = utils.matop.eudist(A,B,False)
-        restrue = utils.matop.eudist(A,B,True)
+        resfalse = util.matop.eudist(A, B, False)
+        restrue = util.matop.eudist(A, B, True)
         targetfalse = np.array([[256],[64]])
         targettrue = np.array([[16],[8]])
         npt.assert_almost_equal(restrue, targettrue)
@@ -42,12 +42,12 @@ class test_spectral_clustering():
     def test_accuracy(self):
         a = np.array([1,2,3,4,5])
         b =  np.array([[1],[2],[3],[4],[6]])
-        npt.assert_equal(utils.io.accuracy(a,b), 0.8)
+        npt.assert_equal(util.io.accuracy(a, b), 0.8)
 
     def test_greedy_matching(self):
         a = np.array([1,1,0,0,0,1])
         b = np.array([2,2,1,1,1,2])
-        a,_ = utils.io.greedy_matching(a,b)
+        a,_ = util.io.greedy_matching(a, b)
         npt.assert_equal(a, b)
 
 def main():

@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.io as scio
-from utils import matop
+from util import matop
 import scipy.sparse as sparse
 
 def train(bf, save_dir):
@@ -54,8 +54,8 @@ def main():
     print(sw)
     scio.savemat('circledata_sparse',{'network': sw})
 
-    import utils
-    bf = utils.batch_feeder(mat=sw, mode='graph', walk_length=20, window_size=5)
+    import util
+    bf = util.batch_feeder(mat=sw, mode='graph', walk_length=20, window_size=5)
     print(next(bf))
     # sample = random.sample(range(2000**2), 10000)
     # plt.hist(w.reshape(2000**2)[sample], bins=100)

@@ -17,3 +17,4 @@ def weight(shape):
 
 def corrupt_input(input, corrupt_level):
     return np.random.binomial(n=1, p=1-corrupt_level, size=input.shape) * input
+

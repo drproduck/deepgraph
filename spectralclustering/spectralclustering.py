@@ -9,8 +9,8 @@ from sklearn.utils.extmath import randomized_svd
 
 from sklearn.cluster import KMeans, k_means_
 from time import time
-from utils.io import make_weight_matrix, greedy_matching, accuracy, best_map
-from utils.matop import eudist, cumdist_matrix
+from util.io import make_weight_matrix, greedy_matching, accuracy, best_map
+from util.matop import eudist, cumdist_matrix
 from random import sample, choices
 import scipy.sparse as sp
 import scipy.io as scio
